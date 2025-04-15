@@ -1,0 +1,74 @@
+from flask import Flask, request, render_template_string
+import sqlite3
+
+app = Flask(__name__)
+
+# Sample quiz questions
+questions = [
+    {"id": 1, "question": "What is the capital of France?", "options": ["Paris", "London", "Berlin", "Rome"], "answer": "Paris"},
+    {"id": 2, "question": "Which language is used for web apps?", "options": ["Python", "HTML", "Java", "All of the above"], "answer": "All of the above"},
+    {"id": 3, "question": "What is 2 + 2?", "options": ["3", "4", "5", "6"], "answer": "4"},
+]
+
+# Create results table if not exists
+def init_db():
+    conn = sqlite3.connect("quiz.db")
+    conn.execute("CREATE TABLE IF NOT EXISTS results (name TEXT, score INTEGER)")
+    conn.commit()
+    conn.close()
+
+# Home/quiz route
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        name = request.form.get("name")
+        score = 0
+        for q in questions:
+            user_answer = request.form.get(str(q["id"]))
+            if user_answer == q["answer"]:
+                score += 1
+        conn = sqlite3.connect("quiz.db")
+        conn.execute("INSERT INTO results (name, score) VALUES (?, ?)", (name, score))
+        conn.commit()
+        conn.close()
+        return render_template_string(result_template, name=name, score=score, total=len(questions))
+    return render_template_string(index_template, questions=questions)
+
+# Inline HTML templates
+index_template = '''
+<!DOCTYPE html>
+<html>
+<head><title>Online Quiz</title></head>
+<body>
+    <h2>Online Quiz</h2>
+    <form method="post">
+        <label>Your Name: <input type="text" name="name" required></label><br><br>
+        {% for q in questions %}
+            <p>{{ q.id }}. {{ q.question }}</p>
+            {% for opt in q.options %}
+                <input type="radio" name="{{ q.id }}" value="{{ opt }}" required> {{ opt }}<br>
+            {% endfor %}
+            <br>
+        {% endfor %}
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>
+'''
+
+result_template = '''
+<!DOCTYPE html>
+<html>
+<head><title>Result</title></head>
+<body>
+    <h2>Result for {{ name }}</h2>
+    <p>You scored {{ score }} out of {{ total }}.</p>
+    <a href="/">Take Quiz Again</a>
+</body>
+</html>
+'''
+
+# Start the app
+if __name__ == "__main__":
+    init_db()
+    app.run(debug=True)
